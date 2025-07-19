@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Acompanhamento de Alunos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 320px;
+            max-height: 400px;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-size: 1.5rem;
+            color: #5E60CE; /* Cor principal da paleta */
+            flex-direction: column;
+        }
+        .spinner {
+            border: 8px solid #f3f3f3; /* Cinza claro */
+            border-top: 8px solid #5E60CE; /* Azul principal */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+            margin-bottom: 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden {
+            display: none !important;
+        }
+        /* Estilos para o modal de mensagem */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            border: none;
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Overlay de Carregamento -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Carregando dados dos alunos...</p>
+    </div>
+
+    <!-- Modal de Mensagem (oculto por padrão) -->
+    <div id="message-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <p id="modal-message" class="text-lg mb-4"></p>
+            <button id="modal-ok-button" class="modal-button">OK</button>
+        </div>
+    </div>
+
+    <!-- Conteúdo Principal do Dashboard -->
+    <div id="dashboard-content" class="container mx-auto p-4 sm:p-6 lg:p-8 hidden">
+
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-gray-900">Dashboard de Acompanhamento</h1>
+            <p class="text-lg text-gray-600 mt-2">Análise de Progresso e Bem-Estar do Aluno</p>
+        </header>
+
+        <div class="bg-white rounded-xl shadow-md p-4 mb-8 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-8">
+            <div class="flex items-center space-x-2">
+                <label for="student-select" class="text-gray-500 text-lg font-medium">Aluno:</label>
+                <select id="student-select" class="p-2 border border-gray-300 rounded-md text-base font-semibold text-[#5E60CE] focus:outline-none focus:ring-2 focus:ring-[#5E60CE]">
+                    <option value="">Carregando...</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-2">
+                <label for="period-select" class="text-gray-500 text-lg font-medium">Período:</label>
+                <select id="period-select" class="p-2 border border-gray-300 rounded-md text-base font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                    <option value="last8weeks">Últimas 8 Semanas</option>
+                    <option value="last4weeks">Últimas 4 Semanas</option>
+                    <option value="alltime">Todo o Período</option>
+                </select>
+            </div>
+            <div id="analysis-period-display" class="text-lg font-medium text-gray-700">
+                Período de Análise: <span class="font-semibold text-blue-600">Últimas 8 Semanas</span>
+            </div>
+        </div>
+
+        <main>
+            <section id="overview" class="mb-10">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Resumo da Última Semana</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Peso Atual</p>
+                        <p id="current-weight" class="text-3xl font-bold text-[#5E60CE] mt-1">-- kg</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Treinos Feitos</p>
+                        <p id="current-workouts" class="text-3xl font-bold text-[#5390D9] mt-1">--</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Score de Sono</p>
+                        <p id="current-sono" class="text-3xl font-bold text-[#48BFE3] mt-1">--/5</p>
+                    </div>
+                    <div id="stress-card" class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Score de Estresse</p>
+                        <p id="current-estresse" class="text-3xl font-bold text-[#F27059] mt-1">--/5</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center col-span-1 sm:col-span-2 lg:col-span-1">
+                        <p class="text-sm text-gray-600">Score de Motivação</p>
+                        <p id="current-motivacao" class="text-3xl font-bold text-[#FFD166] mt-1">--/5</p>
+                    </div>
+                </div>
+                 <p id="stress-highlight" class="text-sm text-red-600 mt-4 text-center hidden font-semibold">O card de estresse está destacado pois o score está em 3 ou mais, indicando um ponto de atenção.</p>
+                 <p id="workouts-highlight" class="text-sm text-red-600 mt-2 text-center hidden font-semibold">O card de treinos está destacado pois a frequência está abaixo da meta (3 treinos), indicando um ponto de atenção.</p>
+            </section>
+            
+            <section id="evolution" class="mb-10">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Evolução Corporal</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Evolução do Peso (kg)</h3>
+                        <p class="text-sm text-gray-600 mb-4">Acompanhamento do peso ao longo das semanas. A linha de tendência mostra o progresso na redução ou manutenção do peso.</p>
+                        <div class="chart-container">
+                            <canvas id="weightChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Evolução das Medidas (cm)</h3>
+                        <p class="text-sm text-gray-600 mb-4">Redução ou variação das medidas corporais ao longo do tempo, permitindo visualizar o impacto do treino e dieta.</p>
+                        <div class="chart-container">
+                            <canvas id="measurementsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="adherence" class="mb-10">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Adesão e Bem-Estar</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                     <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Frequência de Treinos Semanais</h3>
+                        <p class="text-sm text-gray-600 mb-4">Número de treinos realizados por semana. O objetivo é manter a consistência para otimizar os resultados.</p>
+                        <div class="chart-container">
+                            <canvas id="workoutsChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Scores de Bem-Estar (Última Semana)</h3>
+                        <p class="text-sm text-gray-600 mb-4">Visão geral dos fatores subjetivos que influenciam o desempenho e a qualidade de vida do aluno.</p>
+                        <div class="chart-container">
+                            <canvas id="wellbeingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="summary" class="mb-10">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Análise Comparativa e Feedback</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Comparativo: Semana Atual vs. Anterior</h3>
+                         <p class="text-sm text-gray-600 mb-4">Comparação direta dos principais indicadores entre as duas últimas semanas para uma análise rápida de progresso.</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-gray-300">
+                                        <th class="p-3 text-gray-700">Métrica</th>
+                                        <th class="p-3 text-center text-gray-700">Semana Anterior</th>
+                                        <th class="p-3 text-center text-gray-700">Semana Atual</th>
+                                        <th class="p-3 text-center text-gray-700">Variação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="comparison-table-body">
+                                    <tr>
+                                        <td class="p-3 font-medium text-gray-800">Peso (kg)</td>
+                                        <td id="prev-weight" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="curr-weight" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="diff-weight" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 font-medium text-gray-800">Cintura (cm)</td>
+                                        <td id="prev-cintura" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="curr-cintura" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="diff-cintura" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                     <tr>
+                                        <td class="p-3 font-medium text-gray-800">Abdominal (cm)</td>
+                                        <td id="prev-abdominal" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="curr-abdominal" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="diff-abdominal" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                     <tr>
+                                        <td class="p-3 font-medium text-gray-800">Coxa (cm)</td>
+                                        <td id="prev-coxa" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="curr-coxa" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="diff-coxa" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Feedback do Aluno (Última Semana)</h3>
+                        <blockquote class="mt-4 p-4 border-l-4 border-[#5E60CE] bg-gray-50 rounded-md">
+                            <p id="student-feedback" class="text-gray-700 italic">Selecione um aluno para ver o feedback.</p>
+                            <cite id="feedback-cite" class="block text-right text-gray-600 mt-2">-</cite>
+                        </blockquote>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // COLOQUE AQUI O URL DO SEU GOOGLE APPS SCRIPT QUE VOCÊ COPIOU NO PASSO 4!
+        // O URL deve começar com 'https://script.google.com/macros/s/...'
+        const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx0Mrn2u4Cp9175l2gvuhsUL8y0MAIBGt4LUDYlK-IuKnc820AdC4b8OsY2RITi77c_pQ/exec'; // Substitua por seu URL real
+
+        const FONT_COLOR = '#374151'; 
+        const GRID_COLOR = '#E5E7EB'; 
+        const PALETTE = {
+            primary: '#5E60CE', // Azul/Roxo principal
+            secondary: '#5390D9', // Azul mais claro
+            tertiary: '#48BFE3', // Azul ciano
+            accent1: '#F27059', // Laranja avermelhado (para alertas/destaques)
+            accent2: '#FFD166', // Amarelo (para motivação)
+        };
+
+        let allStudentRawData = []; // Armazena todos os dados brutos
+        let allStudentProcessedData = {}; // Armazena os dados processados por aluno
+        let weightChart, measurementsChart, workoutsChart, wellbeingChart;
+
+        // Função para formatar a data para exibição
+        function formatDate(dateString) {
+            if (!dateString) return '--/--/----';
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '--/--/----'; // Verifica se a data é válida
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // Mês é 0-indexed
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        // Função para exibir o modal de mensagem
+        function showMessageModal(message) {
+            const modalOverlay = document.getElementById('message-modal');
+            const modalMessage = document.getElementById('modal-message');
+            modalMessage.textContent = message;
+            modalOverlay.classList.remove('hidden');
+        }
+
+        // Função para fechar o modal de mensagem
+        document.getElementById('modal-ok-button').addEventListener('click', () => {
+            document.getElementById('message-modal').classList.add('hidden');
+        });
+
+        // Configurações padrão para os tooltips e legendas dos gráficos
+        const tooltipConfig = {
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            const item = tooltipItems[0];
+                            let label = item.chart.data.labels[item.dataIndex];
+                            if (Array.isArray(label)) {
+                              return label.join(' ');
+                            } else {
+                              return label;
+                            }
+                        }
+                    }
+                },
+                legend: {
+                    labels: {
+                        color: FONT_COLOR,
+                        font: {
+                            family: "'Inter', sans-serif"
+                        }
+                    }
+                }
+            },
+            maintainAspectRatio: false,
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: { color: FONT_COLOR },
+                    grid: { color: GRID_COLOR }
+                },
+                x: {
+                    ticks: { color: FONT_COLOR },
+                    grid: { display: false }
+                }
+            }
+        };
+
+        // Inicializa os objetos Chart.js
+        function initializeCharts() {
+            const ctxWeight = document.getElementById('weightChart').getContext('2d');
+            weightChart = new Chart(ctxWeight, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Peso (kg)',
+                        data: [],
+                        borderColor: PALETTE.primary,
+                        backgroundColor: 'rgba(94, 96, 206, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: tooltipConfig
+            });
+
+            const ctxMeasurements = document.getElementById('measurementsChart').getContext('2d');
+            measurementsChart = new Chart(ctxMeasurements, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Cintura (cm)',
+                            data: [],
+                            borderColor: PALETTE.secondary,
+                            fill: false,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Abdominal (cm)',
+                            data: [],
+                            borderColor: PALETTE.tertiary,
+                            fill: false,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Coxa (cm)',
+                            data: [],
+                            borderColor: PALETTE.accent1,
+                            fill: false,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: tooltipConfig
+            });
+            
+            const ctxWorkouts = document.getElementById('workoutsChart').getContext('2d');
+            workoutsChart = new Chart(ctxWorkouts, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Treinos Realizados',
+                        data: [],
+                        backgroundColor: PALETTE.secondary,
+                        borderColor: PALETTE.secondary,
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: { ...tooltipConfig, scales: { y: { beginAtZero: true, ticks: { color: FONT_COLOR, precision: 0 }, grid: { color: GRID_COLOR }}, x: { ticks: { color: FONT_COLOR }, grid: { display: false }} }}
+            });
+
+            const ctxWellbeing = document.getElementById('wellbeingChart').getContext('2d');
+            wellbeingChart = new Chart(ctxWellbeing, {
+                type: 'radar',
+                data: {
+                    labels: ['Sono', 'Estresse (Invertido)', 'Motivação'],
+                    datasets: [{
+                        label: 'Última Semana',
+                        data: [],
+                        backgroundColor: 'rgba(94, 96, 206, 0.2)',
+                        borderColor: PALETTE.primary,
+                        pointBackgroundColor: PALETTE.primary,
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: PALETTE.primary
+                    }]
+                },
+                options: {
+                    ...tooltipConfig,
+                    scales: {
+                        r: {
+                            angleLines: { color: GRID_COLOR },
+                            grid: { color: GRID_COLOR },
+                            pointLabels: {
+                                color: FONT_COLOR,
+                                font: { size: 14 }
+                            },
+                            ticks: {
+                                color: FONT_COLOR,
+                                backdropColor: 'rgba(0,0,0,0)',
+                                stepSize: 1,
+                                suggestedMin: 0, // Garante que a escala comece em 0
+                                suggestedMax: 5  // Garante que a escala termine em 5
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 5
+                        }
+                    }
+                }
+            });
+        }
+
+        // Função para atualizar o dashboard com os dados do aluno e período selecionados
+        function updateDashboard() {
+            const studentSelect = document.getElementById('student-select');
+            const periodSelect = document.getElementById('period-select');
+            const analysisPeriodDisplay = document.getElementById('analysis-period-display');
+
+            const selectedStudentName = studentSelect.value;
+            const selectedPeriodKey = periodSelect.value;
+
+            // Define o texto do período de análise
+            let periodText = '';
+            let startDate = null;
+            let endDate = new Date(); // Data de hoje
+
+            if (selectedPeriodKey === 'last8weeks') {
+                periodText = 'Últimas 8 Semanas';
+                startDate = new Date();
+                startDate.setDate(endDate.getDate() - (8 * 7)); // 8 semanas atrás
+            } else if (selectedPeriodKey === 'last4weeks') {
+                periodText = 'Últimas 4 Semanas';
+                startDate = new Date();
+                startDate.setDate(endDate.getDate() - (4 * 7)); // 4 semanas atrás
+            } else { // 'alltime'
+                periodText = 'Todo o Período';
+                startDate = new Date(0); // Data mais antiga possível
+            }
+
+            analysisPeriodDisplay.querySelector('span').textContent = periodText;
+
+            let studentEntries = [];
+            if (allStudentProcessedData[selectedStudentName]) {
+                studentEntries = allStudentProcessedData[selectedStudentName].entries.filter(entry => {
+                    const entryDate = new Date(entry.carimboDataHora);
+                    return entryDate >= startDate && entryDate <= endDate;
+                });
+            }
+
+            if (!selectedStudentName || studentEntries.length === 0) {
+                // Limpa o dashboard se nenhum aluno for selecionado ou não houver dados no período
+                document.getElementById('current-weight').textContent = '-- kg';
+                document.getElementById('current-workouts').textContent = '--';
+                document.getElementById('current-sono').textContent = '--/5';
+                document.getElementById('current-estresse').textContent = '--/5';
+                document.getElementById('current-motivacao').textContent = '--/5';
+                document.getElementById('stress-card').classList.remove('border-2', 'border-[#F27059]');
+                document.getElementById('stress-highlight').classList.add('hidden');
+                document.getElementById('workouts-highlight').classList.add('hidden');
+                document.getElementById('prev-weight').textContent = '--';
+                document.getElementById('curr-weight').textContent = '--';
+                document.getElementById('diff-weight').textContent = '--';
+                document.getElementById('prev-cintura').textContent = '--';
+                document.getElementById('curr-cintura').textContent = '--';
+                document.getElementById('diff-cintura').textContent = '--';
+                document.getElementById('prev-abdominal').textContent = '--';
+                document.getElementById('curr-abdominal').textContent = '--';
+                document.getElementById('diff-abdominal').textContent = '--';
+                document.getElementById('prev-coxa').textContent = '--';
+                document.getElementById('curr-coxa').textContent = '--';
+                document.getElementById('diff-coxa').textContent = '--';
+                document.getElementById('student-feedback').textContent = 'Nenhum feedback disponível.';
+                document.getElementById('feedback-cite').textContent = `- ${selectedStudentName || 'Aluno'}`;
+
+                weightChart.data.labels = [];
+                weightChart.data.datasets[0].data = [];
+                weightChart.update();
+
+                measurementsChart.data.labels = [];
+                measurementsChart.data.datasets[0].data = [];
+                measurementsChart.data.datasets[1].data = [];
+                measurementsChart.data.datasets[2].data = [];
+                measurementsChart.update();
+
+                workoutsChart.data.labels = [];
+                workoutsChart.data.datasets[0].data = [];
+                workoutsChart.update();
+
+                wellbeingChart.data.datasets[0].data = [];
+                wellbeingChart.update();
+                return;
+            }
+
+            // Ordena os dados pela data mais recente
+            const sortedEntries = [...studentEntries].sort((a, b) => new Date(a.carimboDataHora) - new Date(b.carimboDataHora));
+            
+            // Pega a última e penúltima entrada
+            const lastEntry = sortedEntries[sortedEntries.length - 1];
+            const prevEntry = sortedEntries.length > 1 ? sortedEntries[sortedEntries.length - 2] : null;
+
+            // Atualiza o Resumo da Última Semana
+            document.getElementById('current-weight').textContent = `${lastEntry.pesoAtual ? lastEntry.pesoAtual.toFixed(1) : '--'} kg`;
+            document.getElementById('current-workouts').textContent = lastEntry.treinosFeitos !== undefined ? lastEntry.treinosFeitos : '--';
+            document.getElementById('current-sono').textContent = `${lastEntry.sono !== undefined ? lastEntry.sono : '--'}/5`;
+            document.getElementById('current-estresse').textContent = `${lastEntry.estresse !== undefined ? lastEntry.estresse : '--'}/5`;
+            document.getElementById('current-motivacao').textContent = `${lastEntry.motivacao !== undefined ? lastEntry.motivacao : '--'}/5`;
+
+            // Alerta de Estresse
+            const stressCard = document.getElementById('stress-card');
+            const stressHighlight = document.getElementById('stress-highlight');
+            if (lastEntry.estresse >= 3) { // Destaca se o estresse for 3 ou mais
+                stressCard.classList.add('border-2', 'border-[#F27059]');
+                stressHighlight.classList.remove('hidden');
+                stressHighlight.textContent = 'O card de estresse está destacado pois o score está em 3 ou mais, indicando um ponto de atenção.';
+            } else {
+                stressCard.classList.remove('border-2', 'border-[#F27059]');
+                stressHighlight.classList.add('hidden');
+            }
+
+            // Alerta de Treinos
+            const workoutsCard = document.getElementById('current-workouts').closest('.bg-white'); // Pega o div pai do treino
+            const workoutsHighlight = document.getElementById('workouts-highlight');
+            const minWorkouts = 3; // Sua meta mínima de treinos
+            if (lastEntry.treinosFeitos < minWorkouts) {
+                workoutsCard.classList.add('border-2', 'border-[#F27059]'); // Usando a mesma cor de alerta
+                workoutsHighlight.classList.remove('hidden');
+                workoutsHighlight.textContent = `O card de treinos está destacado pois a frequência (${lastEntry.treinosFeitos}) está abaixo da meta (${minWorkouts} treinos), indicando um ponto de atenção.`;
+            } else {
+                workoutsCard.classList.remove('border-2', 'border-[#F27059]');
+                workoutsHighlight.classList.add('hidden');
+            }
+
+            // Atualiza a Tabela Comparativa (Semana Atual vs. Anterior)
+            if (prevEntry) {
+                document.getElementById('prev-weight').textContent = prevEntry.pesoAtual ? prevEntry.pesoAtual.toFixed(1) : '--';
+                document.getElementById('curr-weight').textContent = lastEntry.pesoAtual ? lastEntry.pesoAtual.toFixed(1) : '--';
+                const diffWeight = (lastEntry.pesoAtual - prevEntry.pesoAtual).toFixed(1);
+                document.getElementById('diff-weight').textContent = diffWeight;
+                document.getElementById('diff-weight').className = `p-3 text-center font-bold ${diffWeight < 0 ? 'text-green-600' : (diffWeight > 0 ? 'text-red-600' : 'text-gray-500')}`;
+
+                document.getElementById('prev-cintura').textContent = prevEntry.cintura !== undefined ? prevEntry.cintura : '--';
+                document.getElementById('curr-cintura').textContent = lastEntry.cintura !== undefined ? lastEntry.cintura : '--';
+                const diffCintura = (lastEntry.cintura - prevEntry.cintura).toFixed(1);
+                document.getElementById('diff-cintura').textContent = diffCintura;
+                document.getElementById('diff-cintura').className = `p-3 text-center font-bold ${diffCintura < 0 ? 'text-green-600' : (diffCintura > 0 ? 'text-red-600' : 'text-gray-500')}`;
+
+                document.getElementById('prev-abdominal').textContent = prevEntry.abdominal !== undefined ? prevEntry.abdominal : '--';
+                document.getElementById('curr-abdominal').textContent = lastEntry.abdominal !== undefined ? lastEntry.abdominal : '--';
+                const diffAbdominal = (lastEntry.abdominal - prevEntry.abdominal).toFixed(1);
+                document.getElementById('diff-abdominal').textContent = diffAbdominal;
+                document.getElementById('diff-abdominal').className = `p-3 text-center font-bold ${diffAbdominal < 0 ? 'text-green-600' : (diffAbdominal > 0 ? 'text-red-600' : 'text-gray-500')}`;
+
+                document.getElementById('prev-coxa').textContent = prevEntry.coxa !== undefined ? prevEntry.coxa : '--';
+                document.getElementById('curr-coxa').textContent = lastEntry.coxa !== undefined ? lastEntry.coxa : '--';
+                const diffCoxa = (lastEntry.coxa - prevEntry.coxa).toFixed(1);
+                document.getElementById('diff-coxa').textContent = diffCoxa;
+                document.getElementById('diff-coxa').className = `p-3 text-center font-bold ${diffCoxa < 0 ? 'text-green-600' : (diffCoxa > 0 ? 'text-red-600' : 'text-gray-500')}`;
+            } else {
+                // Limpa a tabela se não houver dados anteriores
+                document.getElementById('prev-weight').textContent = '--';
+                document.getElementById('curr-weight').textContent = lastEntry.pesoAtual ? lastEntry.pesoAtual.toFixed(1) : '--';
+                document.getElementById('diff-weight').textContent = '--';
+                document.getElementById('diff-weight').className = `p-3 text-center font-bold text-gray-500`;
+
+                document.getElementById('prev-cintura').textContent = '--';
+                document.getElementById('curr-cintura').textContent = lastEntry.cintura !== undefined ? lastEntry.cintura : '--';
+                document.getElementById('diff-cintura').textContent = '--';
+                document.getElementById('diff-cintura').className = `p-3 text-center font-bold text-gray-500`;
+
+                document.getElementById('prev-abdominal').textContent = '--';
+                document.getElementById('curr-abdominal').textContent = lastEntry.abdominal !== undefined ? lastEntry.abdominal : '--';
+                document.getElementById('diff-abdominal').textContent = '--';
+                document.getElementById('diff-abdominal').className = `p-3 text-center font-bold text-gray-500`;
+
+                document.getElementById('prev-coxa').textContent = '--';
+                document.getElementById('curr-coxa').textContent = lastEntry.coxa !== undefined ? lastEntry.coxa : '--';
+                document.getElementById('diff-coxa').textContent = '--';
+                document.getElementById('diff-coxa').className = `p-3 text-center font-bold text-gray-500`;
+            }
+
+            // Atualiza Feedback
+            document.getElementById('student-feedback').textContent = lastEntry.feedback || 'Nenhum feedback disponível.';
+            document.getElementById('feedback-cite').textContent = `- ${selectedStudentName}`;
+
+            // Prepara dados para os gráficos
+            const chartLabels = sortedEntries.map(entry => formatDate(entry.dataResposta));
+            const weights = sortedEntries.map(entry => entry.pesoAtual);
+            const cinturas = sortedEntries.map(entry => entry.cintura);
+            const abdominais = sortedEntries.map(entry => entry.abdominal);
+            const coxas = sortedEntries.map(entry => entry.coxa);
+            const workouts = sortedEntries.map(entry => entry.treinosFeitos);
+
+            // Atualiza Gráfico de Peso
+            weightChart.data.labels = chartLabels;
+            weightChart.data.datasets[0].data = weights;
+            weightChart.update();
+
+            // Atualiza Gráfico de Medidas
+            measurementsChart.data.labels = chartLabels;
+            measurementsChart.data.datasets[0].data = cinturas;
+            measurementsChart.data.datasets[1].data = abdominais;
+            measurementsChart.data.datasets[2].data = coxas;
+            measurementsChart.update();
+
+            // Atualiza Gráfico de Treinos
+            workoutsChart.data.labels = chartLabels;
+            workoutsChart.data.datasets[0].data = workouts;
+            workoutsChart.update();
+
+            // Atualiza Gráfico de Bem-Estar (Radar)
+            wellbeingChart.data.datasets[0].data = [
+                lastEntry.sono !== undefined ? lastEntry.sono : 0, 
+                lastEntry.estresse !== undefined ? (6 - lastEntry.estresse) : 0, // Inverte o score de estresse para que 1 seja "melhor" no radar
+                lastEntry.motivacao !== undefined ? lastEntry.motivacao : 0
+            ];
+            wellbeingChart.update();
+        }
+
+        // Função principal para carregar os dados
+        async function loadStudentData() {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const dashboardContent = document.getElementById('dashboard-content');
+            loadingOverlay.classList.remove('hidden');
+            dashboardContent.classList.add('hidden');
+
+            try {
+                // Verifica se o URL do Apps Script foi configurado
+                if (APPS_SCRIPT_WEB_APP_URL === 'COLE_SEU_URL_DO_APPS_SCRIPT_AQUI' || !APPS_SCRIPT_WEB_APP_URL) {
+                    showMessageModal('Por favor, configure o URL do Google Apps Script no código HTML.');
+                    loadingOverlay.querySelector('p').textContent = 'Erro: URL do App Script não configurado.';
+                    return;
+                }
+
+                const response = await fetch(APPS_SCRIPT_WEB_APP_URL);
+                const rawData = await response.json();
+
+                if (rawData.error) {
+                    showMessageModal(`Erro ao carregar dados: ${rawData.error}`);
+                    loadingOverlay.querySelector('p').textContent = `Erro: ${rawData.error}`;
+                    return;
+                }
+
+                if (!Array.isArray(rawData) || rawData.length === 0) {
+                    showMessageModal('Nenhum dado de aluno encontrado na planilha. Verifique sua planilha e o Apps Script.');
+                    loadingOverlay.querySelector('p').textContent = 'Nenhum dado encontrado.';
+                    return;
+                }
+
+                // Processa os dados para organizar por aluno
+                const students = {};
+                rawData.forEach(entry => {
+                    // Mapeia os dados para os nomes esperados pelo dashboard
+                    // Baseado no JSON que você me forneceu anteriormente:
+                    const mappedEntry = {
+                        carimboDataHora: entry.carimboDataHora,
+                        nomeCompleto: entry.seunomecompleto, 
+                        dataResposta: entry.dataResposta,
+                        pesoAtual: parseFloat(entry.pesoAtual),
+                        tirouMedidas: entry.voctiroumedidasessasemana, 
+                        abdominal: parseFloat(entry.abdominalemcm), 
+                        cintura: parseFloat(entry.cinturaemcm),     
+                        coxa: parseFloat(entry.coxasemcm),         
+                        sono: parseInt(entry.qualfoiaqualidadedosonoessasemana15), 
+                        estresse: parseInt(entry.nveldeestressenasemana15),     
+                        motivacao: parseInt(entry.comoestsuamotivaoparatreinar15), 
+                        seguiuTreino: entry.seguiuotreinopropostonoapp, 
+                        treinosFeitos: parseInt(entry.quantostreinosvocfezestasemana), // Convertido para int
+                        feedback: entry.algoquequeiramecontarouperguntar 
+                    };
+
+                    // Converte strings de data para objetos Date para facilitar a ordenação e manipulação
+                    if (mappedEntry.carimboDataHora) {
+                        mappedEntry.carimboDataHora = new Date(mappedEntry.carimboDataHora);
+                    }
+                    if (mappedEntry.dataResposta) {
+                        mappedEntry.dataResposta = new Date(mappedEntry.dataResposta);
+                    }
+
+                    const studentNameKey = mappedEntry.nomeCompleto; // Usa o nome completo como chave
+                    if (studentNameKey) {
+                        if (!students[studentNameKey]) {
+                            students[studentNameKey] = {
+                                name: mappedEntry.nomeCompleto,
+                                entries: []
+                            };
+                        }
+                        students[studentNameKey].entries.push(mappedEntry);
+                    }
+                });
+
+                allStudentProcessedData = students; // Atribui os dados processados
+
+                const studentSelect = document.getElementById('student-select');
+                studentSelect.innerHTML = ''; // Limpa opções existentes
+
+                // Popula o seletor de alunos
+                const studentKeys = Object.keys(allStudentProcessedData).sort(); // Ordena os nomes dos alunos
+                if (studentKeys.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'Nenhum aluno encontrado';
+                    studentSelect.appendChild(option);
+                    updateDashboard(); // Limpa o dashboard
+                } else {
+                    studentKeys.forEach(key => {
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = allStudentProcessedData[key].name;
+                        studentSelect.appendChild(option);
+                    });
+                    // Seleciona o primeiro aluno e atualiza o dashboard
+                    studentSelect.value = studentKeys[0];
+                    updateDashboard();
+                }
+
+                loadingOverlay.classList.add('hidden');
+                dashboardContent.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+                showMessageModal(`Ocorreu um erro ao carregar os dados: ${error.message}. Verifique o console para detalhes.`);
+                loadingOverlay.querySelector('p').textContent = 'Erro ao carregar dados. Verifique o console para detalhes.';
+            }
+        }
+
+        // Evento DOMContentLoaded para inicializar tudo
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeCharts(); // Inicializa os gráficos vazios
+            loadStudentData(); // Carrega os dados reais
+            
+            const studentSelect = document.getElementById('student-select');
+            const periodSelect = document.getElementById('period-select');
+
+            studentSelect.addEventListener('change', updateDashboard);
+            periodSelect.addEventListener('change', updateDashboard);
+        });
+    </script>
+
+</body>
+</html>
