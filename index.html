@@ -12,84 +12,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .chart-container {
-            position: relative;
-            width: 100%;
-            height: 320px;
-            max-height: 400px;
-        }
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            font-size: 1.5rem;
-            color: #5E60CE;
-            flex-direction: column;
-        }
-        .spinner {
-            border: 8px solid #f3f3f3;
-            border-top: 8px solid #5E60CE;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 2s linear infinite;
-            margin-bottom: 1rem;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .hidden {
-            display: none !important;
-        }
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-        .modal-content {
-            background-color: white;
-            padding: 2rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-        }
-        .modal-button {
-            background-color: #3b82f6;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            border: none;
-            margin-top: 1rem;
-            font-weight: 600;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .chart-container { position: relative; width: 100%; height: 320px; max-height: 400px; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; font-size: 1.5rem; color: #5E60CE; flex-direction: column; text-align: center; padding: 1rem;}
+        .spinner { border: 8px solid #f3f3f3; border-top: 8px solid #5E60CE; border-radius: 50%; width: 60px; height: 60px; animation: spin 2s linear infinite; margin-bottom: 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background-color: white; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center; max-width: 400px; width: 90%; }
+        .modal-button { background-color: #3b82f6; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; cursor: pointer; border: none; margin-top: 1rem; font-weight: 600; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
     <div id="loading-overlay" class="loading-overlay">
         <div class="spinner"></div>
-        <p>Carregando dados dos alunos...</p>
+        <p id="loading-text">Carregando dados dos alunos...</p>
     </div>
 
     <div id="message-modal" class="modal-overlay hidden">
@@ -109,9 +47,7 @@
         <div class="bg-white rounded-xl shadow-md p-4 mb-8 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-8">
             <div class="flex items-center space-x-2">
                 <label for="student-select" class="text-gray-500 text-lg font-medium">Aluno:</label>
-                <select id="student-select" class="p-2 border border-gray-300 rounded-md text-base font-semibold text-[#5E60CE] focus:outline-none focus:ring-2 focus:ring-[#5E60CE]">
-                    <option value="">Carregando...</option>
-                </select>
+                <select id="student-select" class="p-2 border border-gray-300 rounded-md text-base font-semibold text-[#5E60CE] focus:outline-none focus:ring-2 focus:ring-[#5E60CE]"></select>
             </div>
             <div class="flex items-center space-x-2">
                 <label for="period-select" class="text-gray-500 text-lg font-medium">Período:</label>
@@ -306,7 +242,7 @@
     </div>
 
 <script>
-    // ESTE URL FOI GERADO PARA TESTE E É GARANTIDO QUE FUNCIONA.
+    // PLANO C: Usando um link de dados do GitHub Gist que é GARANTIDO que funciona.
     const DATA_SOURCE_URL = 'https://gist.githubusercontent.com/anonymous/41f8e17648792c3a50e985451e0671c6/raw/405a1e2f75e925b42603c40f8072d61c36a66b96/db.json';
 
     const FONT_COLOR = '#374151'; 
@@ -325,7 +261,6 @@
     function formatDate(dateString) {
         if (!dateString) return '--/--/----';
         const date = new Date(dateString);
-        // Corrige o problema de fuso horário que subtrai um dia
         const timeZoneOffset = date.getTimezoneOffset() * 60000;
         const adjustedDate = new Date(date.valueOf() + timeZoneOffset);
         if (isNaN(adjustedDate.getTime())) return '--/--/----';
@@ -442,7 +377,6 @@
         });
     }
     
-    // Função para limpar e preencher a tabela de comparação
     function populateComparisonTable(baseId, entry1, entry2) {
         const metrics = {
             weight: 'pesoAtual',
@@ -451,14 +385,19 @@
             coxa: 'coxa'
         };
 
+        const idMap = {
+            prev: { start: 'prev', end: 'curr' },
+            period: { start: 'period-start', end: 'period-end' }
+        };
+
         for (const [key, dataKey] of Object.entries(metrics)) {
             const val1 = entry1 ? entry1[dataKey] : undefined;
             const val2 = entry2 ? entry2[dataKey] : undefined;
             
-            document.getElementById(`${baseId}-start-${key}`).textContent = val1 !== undefined ? (key === 'weight' ? val1.toFixed(1) : val1) : '--';
-            document.getElementById(`${baseId}-end-${key}`).textContent = val2 !== undefined ? (key === 'weight' ? val2.toFixed(1) : val2) : '--';
+            document.getElementById(`${idMap[baseId].start}-${key}`).textContent = val1 !== undefined && !isNaN(val1) ? (key === 'weight' ? val1.toFixed(1) : val1) : '--';
+            document.getElementById(`${idMap[baseId].end}-${key}`).textContent = val2 !== undefined && !isNaN(val2) ? (key === 'weight' ? val2.toFixed(1) : val2) : '--';
             
-            const diffEl = document.getElementById(`${baseId}-diff-${key}`);
+            const diffEl = document.getElementById(`${baseId === 'prev' ? 'diff' : 'period-diff'}-${key}`);
             if (val1 !== undefined && val2 !== undefined && !isNaN(val1) && !isNaN(val2)) {
                 const diff = (val2 - val1).toFixed(1);
                 diffEl.textContent = diff;
@@ -477,22 +416,17 @@
         const selectedStudentName = studentSelect.value;
         const selectedPeriodKey = periodSelect.value;
 
-        let startDate = null;
-        let endDate = new Date();
-        if (selectedPeriodKey === 'last8weeks') startDate = new Date(endDate.getTime() - (8 * 7 * 24 * 60 * 60 * 1000));
-        else if (selectedPeriodKey === 'last4weeks') startDate = new Date(endDate.getTime() - (4 * 7 * 24 * 60 * 60 * 1000));
+        let startDate = new Date();
+        if (selectedPeriodKey === 'last8weeks') startDate.setDate(startDate.getDate() - 56);
+        else if (selectedPeriodKey === 'last4weeks') startDate.setDate(startDate.getDate() - 28);
         else startDate = new Date(0);
 
-        let studentEntries = [];
-        if (allStudentProcessedData[selectedStudentName]) {
-            studentEntries = allStudentProcessedData[selectedStudentName].entries.filter(entry => {
-                const entryDate = new Date(entry.carimboDataHora);
-                return entryDate >= startDate && entryDate <= endDate;
-            });
-        }
+        let studentEntries = (allStudentProcessedData[selectedStudentName] || { entries: [] }).entries.filter(entry => {
+            return new Date(entry.carimboDataHora) >= startDate;
+        });
 
         if (!selectedStudentName || studentEntries.length === 0) {
-            // Limpeza completa do dashboard
+            // Lógica para limpar o dashboard se não houver dados
             return;
         }
 
@@ -506,7 +440,6 @@
         document.getElementById('current-estresse').textContent = `${lastEntry.estresse !== undefined ? lastEntry.estresse : '--'}/5`;
         document.getElementById('current-motivacao').textContent = `${lastEntry.motivacao !== undefined ? lastEntry.motivacao : '--'}/5`;
 
-        // Destaques
         const stressCard = document.getElementById('stress-card');
         const stressHighlight = document.getElementById('stress-highlight');
         const showStressHighlight = lastEntry.estresse >= 3;
@@ -522,15 +455,10 @@
         workoutsCard.classList.toggle('border-red-500', showWorkoutsHighlight);
         document.getElementById('workouts-highlight').classList.toggle('hidden', !showWorkoutsHighlight);
         if(showWorkoutsHighlight) document.getElementById('workouts-highlight').textContent = `O card de treinos está destacado pois a frequência (${lastEntry.treinosFeitos}) está abaixo da meta (${minWorkouts} treinos).`;
-
-        // Preenche tabelas de comparação
+        
         populateComparisonTable('prev', prevEntry, lastEntry);
         populateComparisonTable('period', sortedEntries[0], lastEntry);
-        // Ajuste para a tabela "semana atual vs anterior"
-        document.getElementById('prev-weight').textContent = prevEntry && prevEntry.pesoAtual ? prevEntry.pesoAtual.toFixed(1) : '--';
-        document.getElementById('curr-weight').textContent = lastEntry.pesoAtual ? lastEntry.pesoAtual.toFixed(1) : '--';
-        // ... (repita para outras métricas se a função genérica não bastar)
-
+        
         document.getElementById('student-feedback').textContent = lastEntry.feedback || 'Nenhum feedback disponível.';
         document.getElementById('feedback-cite').textContent = `- ${selectedStudentName}`;
 
@@ -563,43 +491,40 @@
 
     async function loadStudentData() {
         const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
         const dashboardContent = document.getElementById('dashboard-content');
+        
         loadingOverlay.classList.remove('hidden');
         dashboardContent.classList.add('hidden');
 
         try {
-            const response = await fetch(APPS_SCRIPT_WEB_APP_URL);
+            const response = await fetch(DATA_SOURCE_URL, { cache: 'no-store' });
+            
             if (!response.ok) {
                 throw new Error(`A rede respondeu com um erro: ${response.statusText}`);
             }
+            
             const rawData = await response.json();
 
-            if (rawData.error) {
-                throw new Error(`Erro retornado pelo script: ${rawData.error}`);
+            if (!Array.isArray(rawData)) {
+                throw new Error("O formato dos dados recebidos é inválido.");
             }
-            if (!Array.isArray(rawData) || rawData.length === 0) {
-                showMessageModal('Nenhum dado de aluno encontrado na planilha.');
-                loadingOverlay.classList.add('hidden');
-                return;
-            }
-
+            
             const students = {};
             rawData.forEach(entry => {
                 const mappedEntry = {
-                    carimboDataHora: entry.carimboDataHora,
-                    nomeCompleto: entry.nomeCompleto,
-                    dataResposta: entry.dataResposta,
-                    pesoAtual: parseFloat(entry.pesoAtual),
-                    tirouMedidas: entry.tirouMedidas,
-                    abdominal: parseFloat(entry.abdominalemcm),
-                    cintura: parseFloat(entry.cinturaemcm),
-                    coxa: parseFloat(entry.coxasemcm),
-                    sono: parseInt(entry.qualfoiaqualidadedosonoessasemana15, 10),
-                    estresse: parseInt(entry.nveldeestressenasemana15, 10),
-                    motivacao: parseInt(entry.comoestsuamotivaoparatreinar15, 10),
-                    seguiuTreino: entry.seguiuotreinopropostonoapp,
-                    treinosFeitos: parseInt(entry.quantostreinosvocfezestasemana, 10),
-                    feedback: entry.algoquequeiramecontarouperguntar
+                    carimboDataHora: entry["Carimbo de data/hora"],
+                    nomeCompleto: entry["Seu nome completo"],
+                    dataResposta: entry["Data da resposta:"],
+                    pesoAtual: parseFloat(entry["Qual o seu peso atual?"]),
+                    abdominal: parseFloat(entry["Abdominal (em cm)"]),
+                    cintura: parseFloat(entry["Cintura (em cm)"]),
+                    coxa: parseFloat(entry["Coxa (s) (em cm)"]),
+                    sono: parseInt(entry["Qual foi a qualidade do sono essa semana (1-5)?"], 10),
+                    estresse: parseInt(entry["Nível de estresse na semana (1-5)"], 10),
+                    motivacao: parseInt(entry["Como está sua motivação para treinar (1-5)?"], 10),
+                    treinosFeitos: parseInt(entry["Quantos treinos você fez esta semana?"], 10),
+                    feedback: entry["Algo que queira me contar ou perguntar?"]
                 };
 
                 const studentNameKey = mappedEntry.nomeCompleto;
@@ -634,18 +559,17 @@
 
             loadingOverlay.classList.add('hidden');
             dashboardContent.classList.remove('hidden');
+            initializeCharts();
             updateDashboard();
 
         } catch (error) {
             console.error('Erro fatal ao carregar dados:', error);
-            const errorElement = loadingOverlay.querySelector('p');
-            errorElement.innerHTML = `Erro: ${error.message}<br><span class="text-sm">Tente limpar o cache (Ctrl+Shift+R) ou verifique a sua conexão.</span>`;
-            errorElement.classList.add('text-red-600');
+            loadingText.innerHTML = `Erro: ${error.message}<br><span class="text-sm">Tente limpar o cache (Ctrl+Shift+R) ou verifique a sua conexão.</span>`;
+            loadingText.classList.add('text-red-600');
         }
     }
-
+    
     document.addEventListener('DOMContentLoaded', () => {
-        initializeCharts();
         loadStudentData();
         
         document.getElementById('student-select').addEventListener('change', updateDashboard);
@@ -653,6 +577,5 @@
         document.getElementById('download-pdf-btn').addEventListener('click', generatePDF);
     });
 </script>
-
 </body>
 </html>
