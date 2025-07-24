@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Acompanhamento de Alunos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 320px;
+            max-height: 400px;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-size: 1.5rem;
+            color: #5E60CE; /* Cor principal da paleta */
+            flex-direction: column;
+        }
+        .spinner {
+            border: 8px solid #f3f3f3; /* Cinza claro */
+            border-top: 8px solid #5E60CE; /* Azul principal */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+            margin-bottom: 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden {
+            display: none !important;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            border: none;
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Carregando dados dos alunos...</p>
+    </div>
+
+    <div id="message-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <p id="modal-message" class="text-lg mb-4"></p>
+            <button id="modal-ok-button" class="modal-button">OK</button>
+        </div>
+    </div>
+
+    <div id="dashboard-content" class="container mx-auto p-4 sm:p-6 lg:p-8 hidden">
+
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-gray-900">Dashboard de Acompanhamento</h1>
+            <p class="text-lg text-gray-600 mt-2">Análise de Progresso e Bem-Estar do Aluno</p>
+        </header>
+
+        <div class="bg-white rounded-xl shadow-md p-4 mb-8 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-8">
+            <div class="flex items-center space-x-2">
+                <label for="student-select" class="text-gray-500 text-lg font-medium">Aluno:</label>
+                <select id="student-select" class="p-2 border border-gray-300 rounded-md text-base font-semibold text-[#5E60CE] focus:outline-none focus:ring-2 focus:ring-[#5E60CE]">
+                    <option value="">Carregando...</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-2">
+                <label for="period-select" class="text-gray-500 text-lg font-medium">Período:</label>
+                <select id="period-select" class="p-2 border border-gray-300 rounded-md text-base font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                    <option value="last8weeks">Últimas 8 Semanas</option>
+                    <option value="last4weeks">Últimas 4 Semanas</option>
+                    <option value="alltime">Todo o Período</option>
+                </select>
+            </div>
+             <button id="download-pdf-btn" class="bg-[#5E60CE] text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-colors">
+                Baixar Relatório (PDF)
+            </button>
+        </div>
+
+        <main>
+            <section id="overview" class="mb-10">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Resumo da Última Semana</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Peso Atual</p>
+                        <p id="current-weight" class="text-3xl font-bold text-[#5E60CE] mt-1">-- kg</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Treinos Feitos</p>
+                        <p id="current-workouts" class="text-3xl font-bold text-[#5390D9] mt-1">--</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Score de Sono</p>
+                        <p id="current-sono" class="text-3xl font-bold text-[#48BFE3] mt-1">--/5</p>
+                    </div>
+                    <div id="stress-card" class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Score de Estresse</p>
+                        <p id="current-estresse" class="text-3xl font-bold text-[#F27059] mt-1">--/5</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Score de Motivação</p>
+                        <p id="current-motivacao" class="text-3xl font-bold text-[#FFD166] mt-1">--/5</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-5 text-center">
+                        <p class="text-sm text-gray-600">Score da Semana</p>
+                        <p id="current-score" class="text-3xl font-bold text-green-500 mt-1">--/100</p>
+                    </div>
+                </div>
+                 <p id="stress-highlight" class="text-sm text-red-600 mt-4 text-center hidden font-semibold">O card de estresse está destacado pois o score está em 3 ou mais, indicando um ponto de atenção.</p>
+                 <p id="workouts-highlight" class="text-sm text-red-600 mt-2 text-center hidden font-semibold">O card de treinos está destacado pois a frequência está abaixo da meta (3 treinos), indicando um ponto de atenção.</p>
+            </section>
+            
+            <section id="evolution" class="mb-10">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Evolução Corporal</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Evolução do Peso (kg)</h3>
+                        <p class="text-sm text-gray-600 mb-4">Acompanhamento do peso ao longo das semanas.</p>
+                        <div class="chart-container">
+                            <canvas id="weightChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Evolução das Medidas (cm)</h3>
+                        <p class="text-sm text-gray-600 mb-4">Variação das medidas corporais ao longo do tempo.</p>
+                        <div class="chart-container">
+                            <canvas id="measurementsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="adherence" class="mb-10">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Adesão e Bem-Estar</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                     <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Frequência de Treinos Semanais</h3>
+                        <p class="text-sm text-gray-600 mb-4">Número de treinos realizados por semana.</p>
+                        <div class="chart-container">
+                            <canvas id="workoutsChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Scores de Bem-Estar (Radar)</h3>
+                        <p class="text-sm text-gray-600 mb-4">Visão geral dos fatores subjetivos da última semana.</p>
+                        <div class="chart-container">
+                            <canvas id="wellbeingChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Evolução do Score Semanal</h3>
+                        <p class="text-sm text-gray-600 mb-4">Pontuação semanal baseada na adesão e bem-estar.</p>
+                        <div class="chart-container">
+                            <canvas id="scoreChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="summary" class="mb-10">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Análise Comparativa e Feedback</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Comparativo: Semana Atual vs. Anterior</h3>
+                         <p class="text-sm text-gray-600 mb-4">Comparação direta dos principais indicadores entre as duas últimas semanas.</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-gray-300">
+                                        <th class="p-3 text-gray-700">Métrica</th>
+                                        <th class="p-3 text-center text-gray-700">Semana Anterior</th>
+                                        <th class="p-3 text-center text-gray-700">Semana Atual</th>
+                                        <th class="p-3 text-center text-gray-700">Variação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="p-3 font-medium text-gray-800">Peso (kg)</td>
+                                        <td id="prev-weight" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="curr-weight" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="diff-weight" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 font-medium text-gray-800">Cintura (cm)</td>
+                                        <td id="prev-cintura" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="curr-cintura" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="diff-cintura" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                     <tr>
+                                        <td class="p-3 font-medium text-gray-800">Abdominal (cm)</td>
+                                        <td id="prev-abdominal" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="curr-abdominal" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="diff-abdominal" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                     <tr>
+                                        <td class="p-3 font-medium text-gray-800">Coxa (cm)</td>
+                                        <td id="prev-coxa" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="curr-coxa" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="diff-coxa" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Comparativo do Período (Início vs. Fim)</h3>
+                        <p class="text-sm text-gray-600 mb-4">Análise da variação total entre o primeiro e o último registro do período selecionado.</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-gray-300">
+                                        <th class="p-3 text-gray-700">Métrica</th>
+                                        <th class="p-3 text-center text-gray-700">Início do Período</th>
+                                        <th class="p-3 text-center text-gray-700">Fim do Período</th>
+                                        <th class="p-3 text-center text-gray-700">Variação Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="p-3 font-medium text-gray-800">Peso (kg)</td>
+                                        <td id="period-start-weight" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="period-end-weight" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="period-diff-weight" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 font-medium text-gray-800">Cintura (cm)</td>
+                                        <td id="period-start-cintura" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="period-end-cintura" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="period-diff-cintura" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                     <tr>
+                                        <td class="p-3 font-medium text-gray-800">Abdominal (cm)</td>
+                                        <td id="period-start-abdominal" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="period-end-abdominal" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="period-diff-abdominal" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                     <tr>
+                                        <td class="p-3 font-medium text-gray-800">Coxa (cm)</td>
+                                        <td id="period-start-coxa" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="period-end-coxa" class="p-3 text-center text-gray-700">--</td>
+                                        <td id="period-diff-coxa" class="p-3 text-center font-bold">--</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-md p-6 lg:col-span-2">
+                        <h3 class="font-bold mb-1 text-lg text-gray-800">Feedback do Aluno (Última Semana)</h3>
+                        <blockquote class="mt-4 p-4 border-l-4 border-[#5E60CE] bg-gray-50 rounded-md">
+                            <p id="student-feedback" class="text-gray-700 italic">Selecione um aluno para ver o feedback.</p>
+                            <cite id="feedback-cite" class="block text-right text-gray-600 mt-2">-</cite>
+                        </blockquote>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyEY8zQUEEwqdi-5CdzZRo-vEl-bH1ZYx-IwPbomtLsW04VF70GbtlWSDYxi1hnfvyXxw/exec'; // Substitua por seu URL real
+
+        const FONT_COLOR = '#374151'; 
+        const GRID_COLOR = '#E5E7EB'; 
+        const PALETTE = {
+            primary: '#5E60CE', 
+            secondary: '#5390D9',
+            tertiary: '#48BFE3',
+            accent1: '#F27059',
+            accent2: '#FFD166',
+        };
+
+        let allStudentRawData = [];
+        let allStudentProcessedData = {};
+        // NOVO: Declaração da variável do novo gráfico
+        let weightChart, measurementsChart, workoutsChart, wellbeingChart, scoreChart;
+
+        function formatDate(dateString) {
+            if (!dateString) return '--/--/----';
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '--/--/----';
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        function showMessageModal(message) {
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('message-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('modal-ok-button').addEventListener('click', () => {
+            document.getElementById('message-modal').classList.add('hidden');
+        });
+
+        // NOVO: Função para gerar PDF
+        function generatePDF() {
+            const studentName = document.getElementById('student-select').value;
+            const fileName = `Relatorio-${studentName.replace(/ /g, '_')}-${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
+            const dashboardContent = document.getElementById('dashboard-content');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            
+            loadingOverlay.querySelector('p').textContent = 'Gerando PDF...';
+            loadingOverlay.classList.remove('hidden');
+
+            html2canvas(dashboardContent, { scale: 2, useCORS: true }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                
+                loadingOverlay.classList.add('hidden');
+                loadingOverlay.querySelector('p').textContent = 'Carregando dados dos alunos...';
+                pdf.save(fileName);
+            }).catch(err => {
+                console.error("Erro ao gerar PDF:", err);
+                loadingOverlay.classList.add('hidden');
+                loadingOverlay.querySelector('p').textContent = 'Carregando dados dos alunos...';
+                showMessageModal('Ocorreu um erro ao gerar o PDF.');
+            });
+        }
+        
+        // NOVO: Função para calcular o score semanal
+        function calculateWeeklyScore(currentEntry, previousEntry) {
+            if (!currentEntry) return 0;
+            let score = 0;
+
+            // 1. Adesão ao Treino (max 40 pts)
+            const workouts = currentEntry.treinosFeitos;
+            if (workouts === 1) score += 10;
+            else if (workouts === 2) score += 25;
+            else if (workouts >= 3) score += 40;
+
+            // 2. Bem-Estar (max 45 pts)
+            if (currentEntry.sono) score += (currentEntry.sono / 5) * 15;
+            if (currentEntry.motivacao) score += (currentEntry.motivacao / 5) * 15;
+            if (currentEntry.estresse) score += ((6 - currentEntry.estresse) / 5) * 15;
+
+            // 3. Resultados (max 15 pts) - Bônus
+            if (previousEntry) {
+                if (currentEntry.pesoAtual < previousEntry.pesoAtual) {
+                    score += 10;
+                }
+                if (currentEntry.cintura < previousEntry.cintura || 
+                    currentEntry.abdominal < previousEntry.abdominal || 
+                    currentEntry.coxa < previousEntry.coxa) {
+                    score += 5;
+                }
+            }
+            return Math.min(Math.round(score), 100);
+        }
+
+        const tooltipConfig = { /* ... seu tooltipConfig existente ... */ };
+
+        function initializeCharts() {
+            // ... inicialização dos gráficos existentes ...
+            const ctxWeight = document.getElementById('weightChart').getContext('2d');
+            weightChart = new Chart(ctxWeight, { type: 'line', data: { labels: [], datasets: [{ label: 'Peso (kg)', data: [], borderColor: PALETTE.primary, backgroundColor: 'rgba(94, 96, 206, 0.1)', fill: true, tension: 0.3 }] }, options: tooltipConfig });
+            const ctxMeasurements = document.getElementById('measurementsChart').getContext('2d');
+            measurementsChart = new Chart(ctxMeasurements, { type: 'line', data: { labels: [], datasets: [ { label: 'Cintura (cm)', data: [], borderColor: PALETTE.secondary, fill: false, tension: 0.3 }, { label: 'Abdominal (cm)', data: [], borderColor: PALETTE.tertiary, fill: false, tension: 0.3 }, { label: 'Coxa (cm)', data: [], borderColor: PALETTE.accent1, fill: false, tension: 0.3 } ] }, options: tooltipConfig });
+            const ctxWorkouts = document.getElementById('workoutsChart').getContext('2d');
+            workoutsChart = new Chart(ctxWorkouts, { type: 'bar', data: { labels: [], datasets: [{ label: 'Treinos Realizados', data: [], backgroundColor: PALETTE.secondary, borderRadius: 4 }] }, options: { ...tooltipConfig, scales: { y: { beginAtZero: true, ticks: { precision: 0 }}}} });
+            const ctxWellbeing = document.getElementById('wellbeingChart').getContext('2d');
+            wellbeingChart = new Chart(ctxWellbeing, { type: 'radar', data: { labels: ['Sono', 'Estresse (Invertido)', 'Motivação'], datasets: [{ label: 'Última Semana', data: [], backgroundColor: 'rgba(94, 96, 206, 0.2)', borderColor: PALETTE.primary, pointBackgroundColor: PALETTE.primary }] }, options: { ...tooltipConfig, scales: { r: { suggestedMin: 0, suggestedMax: 5, stepSize: 1 }}} });
+            
+            // NOVO: Inicialização do gráfico de Score
+            const ctxScore = document.getElementById('scoreChart').getContext('2d');
+            scoreChart = new Chart(ctxScore, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Score Semanal (de 100)',
+                        data: [],
+                        backgroundColor: 'rgba(74, 222, 128, 0.6)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: { ...tooltipConfig, scales: { y: { beginAtZero: true, suggestedMax: 100 }, x: { ticks: { color: FONT_COLOR }, grid: { display: false }} }}
+            });
+        }
+
+        function updateDashboard() {
+            const studentSelect = document.getElementById('student-select');
+            const periodSelect = document.getElementById('period-select');
+            const selectedStudentName = studentSelect.value;
+            const selectedPeriodKey = periodSelect.value;
+
+            let startDate = null;
+            let endDate = new Date();
+            if (selectedPeriodKey === 'last8weeks') startDate = new Date(endDate.getTime() - (8 * 7 * 24 * 60 * 60 * 1000));
+            else if (selectedPeriodKey === 'last4weeks') startDate = new Date(endDate.getTime() - (4 * 7 * 24 * 60 * 60 * 1000));
+            else startDate = new Date(0);
+
+            let studentEntries = [];
+            if (allStudentProcessedData[selectedStudentName]) {
+                studentEntries = allStudentProcessedData[selectedStudentName].entries.filter(entry => {
+                    const entryDate = new Date(entry.carimboDataHora);
+                    return entryDate >= startDate && entryDate <= endDate;
+                });
+            }
+
+            if (!selectedStudentName || studentEntries.length === 0) {
+                // ... lógica para limpar o dashboard ...
+                return;
+            }
+
+            const sortedEntries = [...studentEntries].sort((a, b) => new Date(a.carimboDataHora) - new Date(b.carimboDataHora));
+            const lastEntry = sortedEntries[sortedEntries.length - 1];
+            const prevEntry = sortedEntries.length > 1 ? sortedEntries[sortedEntries.length - 2] : null;
+
+            // NOVO: Calcular scores para o período
+            const weeklyScores = [];
+            for (let i = 0; i < sortedEntries.length; i++) {
+                const current = sortedEntries[i];
+                const previous = i > 0 ? sortedEntries[i - 1] : null;
+                weeklyScores.push(calculateWeeklyScore(current, previous));
+            }
+            const latestScore = weeklyScores.length > 0 ? weeklyScores[weeklyScores.length - 1] : '--';
+            document.getElementById('current-score').textContent = `${latestScore}/100`;
+
+            // ... seu código existente para atualizar o resumo da última semana ...
+            document.getElementById('current-weight').textContent = `${lastEntry.pesoAtual ? lastEntry.pesoAtual.toFixed(1) : '--'} kg`;
+            document.getElementById('current-workouts').textContent = lastEntry.treinosFeitos !== undefined ? lastEntry.treinosFeitos : '--';
+            document.getElementById('current-sono').textContent = `${lastEntry.sono !== undefined ? lastEntry.sono : '--'}/5`;
+            document.getElementById('current-estresse').textContent = `${lastEntry.estresse !== undefined ? lastEntry.estresse : '--'}/5`;
+            document.getElementById('current-motivacao').textContent = `${lastEntry.motivacao !== undefined ? lastEntry.motivacao : '--'}/5`;
+            
+            // ... seu código existente para os highlights de estresse e treinos ...
+
+            // ... seu código existente para a tabela comparativa da semana ...
+            if (prevEntry) {
+                 // ... preenchimento da tabela ...
+            }
+
+            // NOVO: Lógica para a tabela de Comparativo do Período
+            if (sortedEntries.length > 1) {
+                const firstEntryInPeriod = sortedEntries[0];
+                const lastEntryInPeriod = lastEntry;
+
+                const calculateAndDisplayDiff = (startVal, endVal, elementId) => {
+                    if (startVal !== undefined && endVal !== undefined) {
+                        const diff = (endVal - startVal).toFixed(1);
+                        const diffElement = document.getElementById(elementId);
+                        diffElement.textContent = diff;
+                        diffElement.className = `p-3 text-center font-bold ${diff < 0 ? 'text-green-600' : (diff > 0 ? 'text-red-600' : 'text-gray-500')}`;
+                    }
+                };
+                
+                document.getElementById('period-start-weight').textContent = firstEntryInPeriod.pesoAtual ? firstEntryInPeriod.pesoAtual.toFixed(1) : '--';
+                document.getElementById('period-end-weight').textContent = lastEntryInPeriod.pesoAtual ? lastEntryInPeriod.pesoAtual.toFixed(1) : '--';
+                calculateAndDisplayDiff(firstEntryInPeriod.pesoAtual, lastEntryInPeriod.pesoAtual, 'period-diff-weight');
+
+                document.getElementById('period-start-cintura').textContent = firstEntryInPeriod.cintura !== undefined ? firstEntryInPeriod.cintura : '--';
+                document.getElementById('period-end-cintura').textContent = lastEntryInPeriod.cintura !== undefined ? lastEntryInPeriod.cintura : '--';
+                calculateAndDisplayDiff(firstEntryInPeriod.cintura, lastEntryInPeriod.cintura, 'period-diff-cintura');
+                
+                document.getElementById('period-start-abdominal').textContent = firstEntryInPeriod.abdominal !== undefined ? firstEntryInPeriod.abdominal : '--';
+                document.getElementById('period-end-abdominal').textContent = lastEntryInPeriod.abdominal !== undefined ? lastEntryInPeriod.abdominal : '--';
+                calculateAndDisplayDiff(firstEntryInPeriod.abdominal, lastEntryInPeriod.abdominal, 'period-diff-abdominal');
+
+                document.getElementById('period-start-coxa').textContent = firstEntryInPeriod.coxa !== undefined ? firstEntryInPeriod.coxa : '--';
+                document.getElementById('period-end-coxa').textContent = lastEntryInPeriod.coxa !== undefined ? lastEntryInPeriod.coxa : '--';
+                calculateAndDisplayDiff(firstEntryInPeriod.coxa, lastEntryInPeriod.coxa, 'period-diff-coxa');
+            }
+            
+            // ... seu código para atualizar feedback ...
+
+            const chartLabels = sortedEntries.map(entry => formatDate(entry.dataResposta));
+            // ... atualização dos gráficos de peso, medidas e treinos ...
+            weightChart.data.labels = chartLabels;
+            weightChart.data.datasets[0].data = sortedEntries.map(entry => entry.pesoAtual);
+            weightChart.update();
+            // ...
+
+            // NOVO: Atualização do gráfico de Score
+            scoreChart.data.labels = chartLabels;
+            scoreChart.data.datasets[0].data = weeklyScores;
+            scoreChart.update();
+            
+            wellbeingChart.data.datasets[0].data = [ lastEntry.sono, (6 - lastEntry.estresse), lastEntry.motivacao ];
+            wellbeingChart.update();
+        }
+
+        async function loadStudentData() {
+            // ... sua função loadStudentData existente ...
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeCharts();
+            loadStudentData();
+            
+            document.getElementById('student-select').addEventListener('change', updateDashboard);
+            document.getElementById('period-select').addEventListener('change', updateDashboard);
+            // NOVO: Adiciona evento de clique ao botão de PDF
+            document.getElementById('download-pdf-btn').addEventListener('click', generatePDF);
+        });
+    </script>
+
+</body>
+</html>
